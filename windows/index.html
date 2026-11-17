@@ -104,14 +104,17 @@ function escapeHTML(value){
  return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 function detectMode(idea){
+ const q=idea.toLocaleLowerCase('tr-TR').normalize('NFC');
+ // Görsel isteği her zaman önceliklidir; seçili Web modu bunu ezemez.
+ const imageIntent=/(resim|resmini|resimler|fotoğraf|fotoğrafını|görsel|görselini|illüstrasyon|çizim|çizimini|duvar kağıdı|wallpaper|manzara|portre|logo|afiş|poster|ikon|avatar|thumbnail|kapak fotoğrafı|karakter tasarımı|pixel art|suluboya|yağlı boya)/i.test(q) ||
+   /(resmet|çiz|çizsene|resim yap|fotoğraf yap|görsel yap|bana .* çiz|bana .* resim|bana .* fotoğraf|görsel oluştur|resim oluştur|fotoğraf oluştur)/i.test(q);
+ if(imageIntent) return 'image';
  if(selectedMode!=='auto') return selectedMode;
- const q=idea.toLocaleLowerCase('tr-TR');
- if(/(resim|fotoğraf|görsel|illüstrasyon|çizim|duvar kağıdı|wallpaper|manzara|portre|logo|afiş|poster|ikon|karakter|çizimini|görselini|resmini|fotoğrafını)/.test(q) ||
-    /(çiz|resmet|görselleştir|resim yap|fotoğraf yap|görsel yap|bir resim|bana resim|bana fotoğraf)/.test(q)) return 'image';
  if(/^(merhaba|selam|hey)\b/.test(q) ||
     /(nedir|ne demek|nasıl çalışır|nasıl yapılır|neden|niçin|kimdir|ne zaman|anlat|açıkla|özetle|karşılaştır|yardım eder misin|soru)/.test(q)) return 'chat';
  return 'code';
 }
+
 generate.addEventListener('click',async()=>{
  const idea=promptBox.value.trim();
  if(!idea){status.textContent='Ne yapmak istediğini yaz.';promptBox.focus();return;}
@@ -124,8 +127,9 @@ generate.addEventListener('click',async()=>{
    if(mode==='image'){
      status.textContent='Resmin oluşturulması bekleniyor…';
      const image=await puter.ai.txt2img(idea,{aspect_ratio:'16:9'});
-     if(!image?.src) throw new Error('Görsel oluşturuldu ancak görüntü adresi alınamadı.');
-     const src=escapeHTML(image.src);
+     const imageSrc=typeof image==='string'?image:image?.src;
+     if(!imageSrc) throw new Error('Görsel oluşturuldu ancak görüntü adresi alınamadı.');
+     const src=escapeHTML(imageSrc);
      const html='<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#080c15;color:#fff;font:16px Arial;display:grid;place-items:center;padding:18px}.wrap{width:min(1100px,100%)}img{display:block;width:100%;height:auto;max-height:82vh;object-fit:contain;border-radius:14px;box-shadow:0 12px 50px #0009}p{color:#cbd5e1;line-height:1.5}</style></head><body><main class="wrap"><img src="'+src+'" alt="AI tarafından oluşturulan görsel"><p>'+escapeHTML(idea)+'</p></main></body></html>';
      code.value='Görsel oluşturuldu. Önizleme alanında görüntüleniyor.';
      renderPreview(html);
