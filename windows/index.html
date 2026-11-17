@@ -7,7 +7,7 @@ header{padding:22px 28px;border-bottom:1px solid #202a40}h1{margin:0;font-size:2
 main{display:grid;grid-template-columns: minmax(300px, .85fr) minmax(420px,1.4fr);gap:18px;padding:20px;height:calc(100vh - 92px)}
 .panel{background:#111a2b;border:1px solid #26344d;border-radius:14px;padding:18px;min-height:0;display:flex;flex-direction:column;gap:12px}
 h2{font-size:15px;margin:0;color:#73d9ff;letter-spacing:.5px}textarea{width:100%;min-height:145px;resize:vertical;background:#1a263b;color:white;border:1px solid #344663;border-radius:9px;padding:13px;font:14px Segoe UI;outline:none}
-button{background:#147091;color:white;border:0;border-radius:8px;padding:12px 16px;font-weight:600;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.muted{color:#9eabc2;font-size:12px}#status{color:#68e6b7;min-height:20px}iframe{width:100%;flex:1;background:white;border:0;border-radius:8px;min-height:240px}pre{white-space:pre-wrap;overflow:auto;background:#0b1220;color:#c6e7ff;padding:13px;border-radius:8px;flex:1;min-height:160px;font:12px Consolas,monospace}
+button{background:#147091;color:white;border:0;border-radius:8px;padding:12px 16px;font-weight:600;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.muted{color:#9eabc2;font-size:12px}#status{color:#68e6b7;min-height:20px}iframe{width:100%;flex:1;background:#fff;border:0;border-radius:8px;min-height:280px}iframe:focus{outline:2px solid #39c5ef}pre{white-space:pre-wrap;overflow:auto;background:#0b1220;color:#c6e7ff;padding:13px;border-radius:8px;flex:1;min-height:160px;font:12px Consolas,monospace}
 .actions{display:flex;gap:9px;flex-wrap:wrap}@media(max-width:900px){main{grid-template-columns:1fr;height:auto}iframe{height:420px}}
 </style></head><body>
 <header><h1>✦ Emir Gürbüz AI Studio</h1><p>Ne istediğini yaz; yapay zekâ kodunu oluştursun ve önizlemesini gösterelim.</p></header>
@@ -16,27 +16,37 @@ button{background:#147091;color:white;border:0;border-radius:8px;padding:12px 16
 <button id="generate">✦ YAPAY ZEKÂ KODU OLUŞTURSUN</button>
 <div class="muted">Puter hesabıyla giriş istenebilir. İnternet bağlantısı gerekir.</div><div id="status">Hazır.</div>
 <h2>OLUŞTURULAN HTML / CSS / JS</h2><div class="actions"><button id="copy">KODU KOPYALA</button></div><pre id="code">Henüz kod oluşturulmadı.</pre>
-</section><section class="panel"><h2>CANLI ÖNİZLEME</h2><iframe id="preview" sandbox="allow-scripts"></iframe></section></main>
+</section><section class="panel"><h2>CANLI ÖNİZLEME</h2><iframe id="preview" title="Oluşturulan tasarımın canlı önizlemesi" sandbox="allow-scripts allow-forms allow-modals"></iframe></section></main>
 <script>
 const promptBox=document.getElementById('prompt'),generate=document.getElementById('generate'),status=document.getElementById('status'),code=document.getElementById('code'),preview=document.getElementById('preview');
 let generated='';
+function normalizeHTML(value){
+ let html=String(value||'').trim().replace(/^\`\`\`(?:html)?\s*/i,'').replace(/\s*\`\`\`$/,'').trim();
+ const match=html.match(/<!doctype html[\\s\\S]*|<html[\\s\\S]*/i);
+ if(match) return match[0];
+ if(!html) throw new Error('AI boş yanıt verdi. Tekrar dene.');
+ return '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Tasarımı</title></head><body>'+html+'</body></html>';
+}
+function showPreview(html){
+ preview.srcdoc=html;
+ preview.title='Canlı önizleme';
+}
 generate.onclick=async()=>{
  const idea=promptBox.value.trim(); if(!idea){status.textContent='Önce ne tasarlamak istediğini yaz.';return;}
  if(!window.puter||!puter.ai){status.textContent='AI servisi yüklenemedi. İnternet bağlantını kontrol et.';return;}
  generate.disabled=true;status.textContent='Puter AI kod yazıyor...';
- const instruction='Sen deneyimli bir web arayüzü geliştiricisisin. İsteğe göre modern ve çalışan arayüz tasarla. Yalnızca tek dosyalık tam HTML belgesi döndür. CSS style, JavaScript script içinde olsun. Markdown çiti veya açıklama yazma. Mobil uyumlu ve etkileşimli olsun. İstek: '+idea;
+ const instruction='Sen hızlı ve verimli bir web geliştiricisisin. İsteği karşılayan, çalışan ve mobil uyumlu tek dosyalık tam HTML üret. CSS ve JavaScript dosyanın içinde olsun. Gereksiz açıklama, yorum, tekrar ve ağır efekt kullanma. Harici kütüphane kullanma. Yalnızca HTML kodu döndür. İstek: '+idea;
  try{
-  const response=await puter.ai.chat(instruction,{model:'gpt-5.4-nano',max_tokens:8192,temperature:.7});
+  const response=await puter.ai.chat(instruction,{model:'gpt-5.4-nano',max_tokens:4096,temperature:.4});
   let answer=response?.message?.content ?? response?.content ?? response?.text ?? response;
   if(Array.isArray(answer))answer=answer.map(x=>typeof x==='string'?x:(x?.text??'')).join('\n');
   if(answer && typeof answer==='object') answer=answer.text ?? answer.content ?? '';
-  generated=String(answer||'').replace(/^```(?:html)?\s*/i,'').replace(/\s*```$/,'').trim();
-  if(!/<html|<!doctype/i.test(generated))throw new Error('AI geçerli HTML döndürmedi. Tekrar dene.');
-  code.textContent=generated;preview.srcdoc=generated;status.textContent='Kod hazır! Önizlemesi sağda.';
+  generated=normalizeHTML(answer);
+  code.textContent=generated;showPreview(generated);status.textContent='Kod hazır! Önizlemesi sağda.';
   localStorage.setItem('generated_html',generated);
  }catch(e){let detail='';try{detail=typeof e==='string'?e:JSON.stringify(e);}catch(_){detail=String(e);}status.textContent='AI hatası: '+(e?.message||detail||'Bilinmeyen hata');}
  finally{generate.disabled=false;}
 };
 document.getElementById('copy').onclick=async()=>{if(!generated)return;try{await navigator.clipboard.writeText(generated);status.textContent='Kod panoya kopyalandı.';}catch(e){status.textContent='Kopyalama başarısız.';}};
-const saved=localStorage.getItem('generated_html');if(saved){generated=saved;code.textContent=saved;preview.srcdoc=saved;status.textContent='Önceki tasarım yüklendi.';}
+const saved=localStorage.getItem('generated_html');if(saved){generated=saved;code.textContent=saved;showPreview(saved);status.textContent='Önceki tasarım yüklendi.';}else{preview.srcdoc='<!doctype html><html><body style="font:16px Arial;display:grid;place-items:center;height:100vh;color:#526078">Oluşturduğun tasarım burada görünecek.</body></html>';}
 </script></body></html>
