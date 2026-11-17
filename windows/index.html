@@ -89,36 +89,74 @@ function runInNewTab(){
    status.textContent='Kod yeni sekmede çalıştırıldı.';
  }catch(error){status.textContent='Çalıştırma hatası: '+(error?.message||String(error));}
 }
+function escapeHTML(value){
+ return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function detectMode(idea){
+ const q=idea.toLocaleLowerCase('tr-TR');
+ if(/\\b(resim|fotoğraf|görsel|illüstrasyon|çizim|duvar kağıdı|wallpaper|manzara resmi|logo resmi)\\b/.test(q) ||
+    /(resim|fotoğraf|görsel|manzara|portre).{0,24}(yap|oluştur|çiz|üret)/.test(q) ||
+    /(yap|oluştur|çiz|üret).{0,24}(resim|fotoğraf|görsel|manzara|portre)/.test(q)) return 'image';
+ if(/(web sitesi|web sayfası|internet sitesi|uygulama|app|oyun|program|hesap makinesi|arayüz|dashboard|panel|html|css|javascript|kod yaz|kodla|site yap)/.test(q)) return 'code';
+ if(code.value.trim() && code.value.trim()!=='Henüz kod oluşturulmadı.' &&
+    /(değiştir|düzenle|ekle|çıkar|kaldır|renk|buton|özellik|tasarımı|tasarımını|güncelle)/.test(q)) return 'code';
+ return 'chat';
+}
 generate.addEventListener('click',async()=>{
  const idea=promptBox.value.trim();
- if(!idea){status.textContent='Önce ne oluşturmak istediğini yaz.';promptBox.focus();return;}
+ if(!idea){status.textContent='Ne yapmak istediğini yaz.';promptBox.focus();return;}
  if(busy)return;
- if(!window.puter?.ai?.chat){status.textContent='AI servisi yüklenemedi. Sayfayı yenileyip tekrar dene.';return;}
+ if(!window.puter?.ai){status.textContent='AI servisi yüklenemedi. Sayfayı yenileyip tekrar dene.';return;}
  controller=new AbortController();setBusy(true);
- generated='';code.value='AI yanıtı bekleniyor…';status.textContent='AI bağlanıyor…';previewState.textContent='Kod bekleniyor';
- const prompt=`Bir kıdemli web geliştiricisi gibi davran. Kullanıcının isteğini eksiksiz karşılayan, gerçekten çalışan bir web arayüzü üret.
+ generated='';code.value='İşleniyor…';status.textContent='İsteğin anlaşılıyor…';previewState.textContent='Hazırlanıyor';
+ const mode=detectMode(idea);
+ try{
+   if(mode==='image'){
+     status.textContent='Resmin oluşturulması bekleniyor…';
+     const image=await puter.ai.txt2img(idea,{aspect_ratio:'16:9'});
+     if(!image?.src) throw new Error('Görsel oluşturuldu ancak görüntü adresi alınamadı.');
+     const src=escapeHTML(image.src);
+     const html='<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#080c15;color:#fff;font:16px Arial;display:grid;place-items:center;padding:18px}.wrap{width:min(1100px,100%)}img{display:block;width:100%;height:auto;max-height:82vh;object-fit:contain;border-radius:14px;box-shadow:0 12px 50px #0009}p{color:#cbd5e1;line-height:1.5}</style></head><body><main class="wrap"><img src="'+src+'" alt="AI tarafından oluşturulan görsel"><p>'+escapeHTML(idea)+'</p></main></body></html>';
+     code.value='Görsel oluşturuldu. Önizleme alanında görüntüleniyor.';
+     renderPreview(html);
+     status.textContent='Görsel hazır.';
+   }else if(mode==='chat'){
+     status.textContent='Yanıt hazırlanıyor…';
+     const result=await puter.ai.chat(idea,{model:'gpt-5.4-nano',signal:controller.signal});
+     const answer=typeof result==='string'?result:(result?.message?.content||result?.text||'Yanıt alınamadı.');
+     code.value=answer;
+     const html='<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:28px;background:#101827;color:#edf3ff;font:16px/1.7 Arial}main{max-width:850px;margin:auto;white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><main>'+escapeHTML(answer)+'</main></body></html>';
+     renderPreview(html);
+     status.textContent='Yanıt hazır.';
+   }else{
+     const existing=code.value.trim();
+     const hasExisting=existing && existing!=='Henüz kod oluşturulmadı.' && existing!=='İşleniyor…' && !existing.startsWith('Görsel oluşturuldu.');
+     const prompt=`Bir kıdemli web geliştiricisi gibi davran. Kullanıcının isteğini eksiksiz karşılayan, gerçekten çalışan bir web arayüzü üret.
 Yalnızca tek dosyalık tam HTML döndür; CSS ve JavaScript aynı dosyada bulunsun.
 Önce çalışan temel özellikleri yap, sonra görünümü güzelleştir. Butonları işlevsiz bırakma.
-Gereksiz açıklama, Markdown çiti, büyük kütüphane ve gereksiz animasyon ekleme. Harici kütüphane gerekiyorsa kullanma; saf HTML/CSS/JS tercih et.
+Mevcut bir projeyi güncelleme isteğiyse mevcut kodun yapısını ve çalışan özelliklerini koru; yalnızca istenen değişiklikleri yap.
+Gereksiz açıklama, Markdown çiti ve gereksiz kütüphane ekleme. Saf HTML/CSS/JS kullan.
 Mobil ve masaüstüne uyumlu, performanslı kod üret.
-Kullanıcı isteği: ${idea}`;
- try{
-   const stream=await puter.ai.chat(prompt,{model:'gpt-5.4-nano',stream:true,max_tokens:4096,temperature:0.35,signal:controller.signal});
-   let raw='';
-   for await(const part of stream){
-     if(part?.type==='error') throw new Error(part.message||'AI yanıt üretirken hata oluştu.');
-     if(part?.type==='text' && typeof part.text==='string') raw+=part.text;
-     else if(typeof part?.text==='string' && !part.type) raw+=part.text;
-     if(raw){code.value=raw;code.scrollTop=code.scrollHeight;status.textContent='Kod oluşturuluyor…';}
+Kullanıcı isteği: ${idea}
+${hasExisting?'GÜNCELLENECEK MEVCUT HTML KODU:\\n'+existing:''}`;
+     status.textContent='Kod oluşturuluyor…';
+     const stream=await puter.ai.chat(prompt,{model:'gpt-5.4-nano',stream:true,max_tokens:6000,temperature:0.35,signal:controller.signal});
+     let raw='';
+     for await(const part of stream){
+       if(part?.type==='error') throw new Error(part.message||'AI yanıt üretirken hata oluştu.');
+       if(part?.type==='text' && typeof part.text==='string') raw+=part.text;
+       else if(typeof part?.text==='string' && !part.type) raw+=part.text;
+       if(raw){code.value=raw;code.scrollTop=code.scrollHeight;status.textContent='Kod oluşturuluyor…';}
+     }
+     generated=cleanHTML(raw);
+     code.value=generated;renderPreview(generated);
+     try{localStorage.setItem('generated_html',generated);}catch(_){}
+     status.textContent='Kod hazır. Önizleme gösteriliyor.';
    }
-   generated=cleanHTML(raw);
-   code.value=generated;renderPreview(generated);
-   try{localStorage.setItem('generated_html',generated);}catch(_){}
-   status.textContent='Tamamlandı. Önizleme hazır.';
  }catch(error){
    const msg=error?.name==='AbortError'?'İşlem durduruldu.':(error?.message||String(error));
    status.textContent='Hata: '+msg;
-   if(!generated && code.value==='AI yanıtı bekleniyor…')code.value='Kod üretilemedi.';
+   if(code.value==='İşleniyor…')code.value='İşlem tamamlanamadı.';
  }finally{controller=null;setBusy(false);}
 });
 stopButton.addEventListener('click',()=>{if(controller)controller.abort();});
