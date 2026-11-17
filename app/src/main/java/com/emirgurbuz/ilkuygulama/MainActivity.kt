@@ -10,18 +10,16 @@ import android.content.Context
 import android.view.Gravity
 import android.view.View
 import android.webkit.*
+import android.webkit.JavascriptInterface
+import android.webkit.CookieManager
 import android.widget.*
-import org.json.JSONArray
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private val pool = Executors.newSingleThreadExecutor()
     private lateinit var prompt: EditText
-    private lateinit var apiKey: EditText
+    private lateinit var aiEngine: WebView
+    private var aiReady = false
     private lateinit var preview: WebView
     private lateinit var codeView: TextView
     private lateinit var status: TextView
@@ -58,20 +56,11 @@ class MainActivity : Activity() {
         }
         page.addView(prompt, LinearLayout.LayoutParams(-1, dp(120)))
         page.addView(gap(10))
-        apiKey = EditText(this).apply {
-            hint = "Gemini API anahtarın"
-            setHintTextColor(Color.GRAY)
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            inputType = 129
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            setBackgroundColor(Color.rgb(24, 31, 48))
-        }
-        page.addView(apiKey, LinearLayout.LayoutParams(-1, dp(50)))
-        page.addView(label("Anahtar cihazda saklanmaz. GitHub'a veya başkasına gönderme.", 11, Color.GRAY))
+        page.addView(label("API anahtarı gerekmez. AI hizmeti için Puter hesabınla giriş yapman istenebilir.", 11, Color.GRAY))
         generateButton = button("✦  YAPAY ZEKÂ KODU OLUŞTURSUN")
         page.addView(generateButton)
         generateButton.setOnClickListener { generate() }
+        setupAiEngine()
         page.addView(gap(16))
         page.addView(label("CANLI ÖNİZLEME", 16, Color.WHITE, true))
         preview = WebView(this).apply {
@@ -120,54 +109,80 @@ class MainActivity : Activity() {
     }
 
     private fun generate() {
-        val key = apiKey.text.toString().trim()
         val idea = prompt.text.toString().trim()
-        if (key.isEmpty()) { status.text = "Gemini API anahtarını gir."; return }
         if (idea.isEmpty()) { status.text = "Önce ne tasarlamak istediğini yaz."; return }
+        if (!aiReady) { status.text = "Yapay zekâ bağlantısı hazırlanıyor. Birkaç saniye bekle."; return }
         generateButton.isEnabled = false
-        status.text = "Yapay zekâ kod yazıyor..."
-        pool.execute {
-            try {
-                val instruction = """
+        status.text = "Puter AI kod yazıyor..."
+        val instruction = """
 Sen deneyimli bir web arayüzü geliştiricisisin. Kullanıcının isteğine göre güzel, modern ve çalışan bir arayüz tasarla.
 Yalnızca TEK DOSYALIK, tam HTML belgesi döndür. CSS style etiketi içinde, JavaScript script etiketi içinde olsun.
 Markdown kod çiti, açıklama veya başka metin yazma. Harici kütüphane, internet görseli, dış bağlantı veya sunucu kullanma.
 Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan zengin ve etkileşimli olsun.
 İstek: $idea
-                """.trimIndent()
-                val body = JSONObject().put("contents", JSONArray().put(
-                    JSONObject().put("parts", JSONArray().put(JSONObject().put("text", instruction)))
-                )).put("generationConfig", JSONObject().put("temperature", 0.8).put("maxOutputTokens", 8192))
-                val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + key)
-                val con = url.openConnection() as HttpURLConnection
-                con.requestMethod = "POST"
-                con.connectTimeout = 20000
-                con.readTimeout = 60000
-                con.doOutput = true
-                con.setRequestProperty("Content-Type", "application/json")
-                OutputStreamWriter(con.outputStream, Charsets.UTF_8).use { it.write(body.toString()) }
-                val responseCode = con.responseCode
-                val stream = if (responseCode in 200..299) con.inputStream else con.errorStream
-                val raw = stream.bufferedReader().use { it.readText() }
-                con.disconnect()
-                if (responseCode !in 200..299) throw Exception("Gemini API $responseCode: " + raw.take(250))
-                val answer = JSONObject(raw).getJSONArray("candidates").getJSONObject(0)
-                    .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+        """.trimIndent()
+        val encoded = org.json.JSONObject.quote(instruction)
+        aiEngine.evaluateJavascript("window.generateCode($encoded);", null)
+    }
+
+    private fun setupAiEngine() {
+        aiEngine = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            CookieManager.getInstance().setAcceptCookie(true)
+            CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+            addJavascriptInterface(AiBridge(), "AndroidBridge")
+            webChromeClient = WebChromeClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    aiReady = true
+                    runOnUiThread { status.text = "AI bağlantısı hazır. Tasarımını yazabilirsin." }
+                }
+            }
+        }
+        val enginePage = """
+            <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+            <script src="https://js.puter.com/v2/"></script></head><body>
+            <script>
+            window.generateCode = async function(prompt) {
+              try {
+                if (!window.puter || !puter.ai) throw new Error("Puter AI yüklenemedi. İnternet bağlantını kontrol et.");
+                const response = await puter.ai.chat(prompt, {model: "gpt-5.4-nano", max_tokens: 8192, temperature: 0.7});
+                let answer = response && response.message ? response.message.content : "";
+                if (Array.isArray(answer)) answer = answer.map(x => x.text || "").join("\\n");
+                AndroidBridge.onResult(String(answer || ""));
+              } catch (error) {
+                AndroidBridge.onError(String(error && error.message ? error.message : error));
+              }
+            };
+            </script></body></html>
+        """.trimIndent()
+        aiEngine.loadDataWithBaseURL("https://puter.com/", enginePage, "text/html", "UTF-8", null)
+    }
+
+    inner class AiBridge {
+        @JavascriptInterface
+        fun onResult(answer: String) {
+            runOnUiThread {
                 val html = answer.replace("```html", "").replace("```", "").trim()
                 if (!html.contains("<html", true) && !html.contains("<!doctype", true)) {
-                    throw Exception("AI geçerli HTML kodu döndürmedi. Tekrar dene.")
-                }
-                runOnUiThread {
+                    status.text = "AI geçerli HTML kodu döndürmedi. Tekrar dene."
+                } else {
                     showCode(html)
                     getPreferences(0).edit().putString("generated_html", html).apply()
                     status.text = "Kod hazır! Önizlemesini yukarıda görebilirsin."
-                    generateButton.isEnabled = true
                 }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    status.text = "Hata: " + (e.message ?: "Bağlantı kurulamadı")
-                    generateButton.isEnabled = true
-                }
+                generateButton.isEnabled = true
+            }
+        }
+
+        @JavascriptInterface
+        fun onError(message: String) {
+            runOnUiThread {
+                status.text = "AI hatası: " + message.take(220)
+                generateButton.isEnabled = true
             }
         }
     }
@@ -196,6 +211,7 @@ Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan 
 
     override fun onDestroy() {
         preview.destroy()
+        aiEngine.destroy()
         pool.shutdown()
         super.onDestroy()
     }
