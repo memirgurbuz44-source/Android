@@ -68,17 +68,13 @@ class MainActivity : Activity() {
         preview = WebView(this).apply {
             setBackgroundColor(Color.rgb(18, 23, 35))
             settings.javaScriptEnabled = true
-            settings.domStorageEnabled = false
+            settings.domStorageEnabled = true
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             settings.loadsImagesAutomatically = true
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
-                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                    val u = request?.url?.scheme ?: return null
-                    return if (u == "data" || u == "about") null
-                    else WebResourceResponse("text/plain", "UTF-8", 403, "Blocked", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0)))
-                }
+
             }
         }
         page.addView(preview, LinearLayout.LayoutParams(-1, dp(360)))
@@ -139,22 +135,24 @@ Kısa, optimize edilmiş, mobil uyumlu ve çalışan kod üret; gereksiz efekt v
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    aiReady = true
+                    // SDK readiness is reported by the script load callback.
                 }
             }
         }
         val enginePage = """
             <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
-            <script src="https://js.puter.com/v2/"></script></head><body>
+            <script src="https://js.puter.com/v2/" onload="AndroidBridge.onReady()"></script></head><body>
             <script>
             window.generateCode = async function(prompt) {
               try {
                 if (!window.puter || !puter.ai) throw new Error("Puter AI yüklenemedi. İnternet bağlantını kontrol et.");
-                const response = await puter.ai.chat(prompt, {model: "gpt-5.4-nano", max_tokens: 4096, temperature: 0.4});
-                let answer = response?.message?.content ?? response?.content ?? response?.text ?? response;
-                if (Array.isArray(answer)) answer = answer.map(x => typeof x === "string" ? x : (x?.text || "")).join("\\n");
-                if (answer && typeof answer === "object") answer = answer.text ?? answer.content ?? "";
-                AndroidBridge.onResult(String(answer || ""));
+                const stream = await puter.ai.chat(prompt, {model: "gpt-5.4-nano", stream: true, max_tokens: 4096, temperature: 0.35});
+                let answer = "";
+                for await (const part of stream) {
+                  if (part?.type === "error") throw new Error(part.message || "AI yanıt üretirken hata oluştu.");
+                  if (part?.type === "text" && typeof part.text === "string") { answer += part.text; AndroidBridge.onChunk(part.text); }
+                }
+                AndroidBridge.onResult(answer);
               } catch (error) {
                 let detail = ""; try { detail = typeof error === "string" ? error : JSON.stringify(error); } catch (_) { detail = String(error); }
                 AndroidBridge.onError(String(error?.message || detail || "Bilinmeyen hata"));
@@ -166,6 +164,15 @@ Kısa, optimize edilmiş, mobil uyumlu ve çalışan kod üret; gereksiz efekt v
     }
 
     inner class AiBridge {
+        @JavascriptInterface
+        fun onReady() {
+            runOnUiThread { aiReady = true; status.text = "AI hazır. Tasarımını yazabilirsin." }
+        }
+
+        @JavascriptInterface
+        fun onChunk(part: String) {
+            runOnUiThread { codeView.text = codeView.text.toString() + part }
+        }
         @JavascriptInterface
         fun onResult(answer: String) {
             runOnUiThread {
