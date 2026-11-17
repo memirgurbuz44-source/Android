@@ -91,7 +91,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(190, 230, 255))
             setPadding(dp(12), dp(12), dp(12), dp(12))
             setBackgroundColor(Color.rgb(15, 20, 32))
-            textIsSelectable = true
+            setTextIsSelectable(true)
         }
         page.addView(codeView, LinearLayout.LayoutParams(-1, dp(260)))
         val copy = button("KODU KOPYALA")
