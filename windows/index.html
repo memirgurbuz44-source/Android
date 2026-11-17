@@ -35,10 +35,10 @@ button:hover:not(:disabled){border-color:#58d8ff;background:#1c3850}button:disab
  <div class="hint">Kod geldikçe burada görünür. AI hizmeti için internet ve Puter hesabı gerekebilir.</div>
  <div class="status" id="status" role="status" aria-live="polite">Hazır. Ne yapmak istediğini yaz.</div>
  <div class="panelhead"><h2>OLUŞTURULAN KOD</h2><button id="copy">Kodu kopyala</button></div>
- <pre class="editor" id="code">Henüz kod oluşturulmadı.</pre>
+ <textarea class="editor" id="code" spellcheck="false" placeholder="Oluşturulan HTML kodu burada görünecek. İstersen düzenleyip Kodu çalıştır’a basabilirsin.">Henüz kod oluşturulmadı.</textarea>
 </section>
 <section class="panel previewPanel">
- <div class="panelhead"><h2>CANLI ÖNİZLEME</h2><span class="sub" id="previewState">Bekleniyor</span></div>
+ <div class="panelhead"><h2>ÖNİZLEME</h2><div class="actions"><button id="runCode" class="primary">▶ Kodu çalıştır</button><span class="sub" id="previewState">Bekleniyor</span></div></div>
  <iframe id="preview" title="Oluşturulan tasarımın önizlemesi" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"></iframe>
 </section>
 </main>
@@ -77,7 +77,7 @@ generate.addEventListener('click',async()=>{
  if(busy)return;
  if(!window.puter?.ai?.chat){status.textContent='AI servisi yüklenemedi. Sayfayı yenileyip tekrar dene.';return;}
  controller=new AbortController();setBusy(true);
- generated='';code.textContent='AI yanıtı bekleniyor…';status.textContent='AI bağlanıyor…';previewState.textContent='Kod bekleniyor';
+ generated='';code.value='AI yanıtı bekleniyor…';status.textContent='AI bağlanıyor…';previewState.textContent='Kod bekleniyor';
  const prompt=`Bir kıdemli web geliştiricisi gibi davran. Kullanıcının isteğini eksiksiz karşılayan, gerçekten çalışan bir web arayüzü üret.
 Yalnızca tek dosyalık tam HTML döndür; CSS ve JavaScript aynı dosyada bulunsun.
 Önce çalışan temel özellikleri yap, sonra görünümü güzelleştir. Butonları işlevsiz bırakma.
@@ -91,27 +91,41 @@ Kullanıcı isteği: ${idea}`;
      if(part?.type==='error') throw new Error(part.message||'AI yanıt üretirken hata oluştu.');
      if(part?.type==='text' && typeof part.text==='string') raw+=part.text;
      else if(typeof part?.text==='string' && !part.type) raw+=part.text;
-     if(raw){code.textContent=raw;code.scrollTop=code.scrollHeight;status.textContent='Kod oluşturuluyor…';}
+     if(raw){code.value=raw;code.scrollTop=code.scrollHeight;status.textContent='Kod oluşturuluyor…';}
    }
    generated=cleanHTML(raw);
-   code.textContent=generated;renderPreview(generated);
+   code.value=generated;renderPreview(generated);
    try{localStorage.setItem('generated_html',generated);}catch(_){}
    status.textContent='Tamamlandı. Önizleme hazır.';
  }catch(error){
    const msg=error?.name==='AbortError'?'İşlem durduruldu.':(error?.message||String(error));
    status.textContent='Hata: '+msg;
-   if(!generated && code.textContent==='AI yanıtı bekleniyor…')code.textContent='Kod üretilemedi.';
+   if(!generated && code.value==='AI yanıtı bekleniyor…')code.value='Kod üretilemedi.';
  }finally{controller=null;setBusy(false);}
 });
 stopButton.addEventListener('click',()=>{if(controller)controller.abort();});
+
+document.getElementById('runCode').addEventListener('click',()=>{
+ try{
+   const html=cleanHTML(code.value);
+   generated=html;
+   code.value=html;
+   renderPreview(html);
+   try{localStorage.setItem('generated_html',html);}catch(_){}
+   status.textContent='Kod çalıştırıldı. Önizleme güncellendi.';
+ }catch(error){
+   status.textContent='Önizleme hatası: '+(error?.message||String(error));
+ }
+});
+
 document.getElementById('copy').addEventListener('click',async()=>{
- const text=generated||code.textContent;
+ const text=code.value||generated;
  if(!text||text==='Henüz kod oluşturulmadı.')return;
  try{await navigator.clipboard.writeText(text);status.textContent='Kod kopyalandı.';}
  catch(_){status.textContent='Kopyalama izni yok. Kodu seçip Ctrl+C kullanabilirsin.';}
 });
 const saved=(()=>{try{return localStorage.getItem('generated_html')}catch(_){return null}})();
-if(saved){generated=saved;code.textContent=saved;renderPreview(saved);status.textContent='Önceki tasarım yüklendi.';}
+if(saved){generated=saved;code.value=saved;renderPreview(saved);status.textContent='Önceki tasarım yüklendi.';}
 else{preview.srcdoc='<!doctype html><html><body style="margin:0;display:grid;place-items:center;height:100vh;font:15px Arial;color:#64748b">Oluşturduğun tasarım burada görünecek.</body></html>';}
 </script>
 </body></html>
