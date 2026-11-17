@@ -202,7 +202,7 @@ Kısa, optimize edilmiş, mobil uyumlu ve çalışan kod üret; gereksiz efekt v
     private fun showCode(html: String) {
         generatedCode = html
         codeView.text = html
-        val csp = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data: blob:; media-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'\">"
+        val csp = "<meta http-equiv='Content-Security-Policy' content=\"default-src https: data: blob: 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; style-src https: 'unsafe-inline'; script-src https: 'unsafe-inline'; font-src https: data:; connect-src https:; object-src 'none'; form-action 'none'; base-uri 'none'\">"
         val safeHtml = if (html.contains("<head", true)) {
             html.replaceFirst(Regex("(?i)<head[^>]*>"), "$0$csp")
         } else "<html><head>$csp</head><body>$html</body></html>"
