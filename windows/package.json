@@ -1,0 +1,31 @@
+{
+  "name": "emir-gurbuz-ai-studio",
+  "version": "1.0.0",
+  "description": "Emir Gürbüz AI Studio for Windows",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.emirgurbuz.aistudio",
+    "productName": "Emir Gurbuz AI Studio",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "index.html"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "artifactName": "Emir-Gurbuz-AI-Studio.exe"
+    }
+  }
+}
