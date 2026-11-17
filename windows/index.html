@@ -34,7 +34,7 @@ button:hover:not(:disabled){border-color:#58d8ff;background:#1c3850}button:disab
  <div class="actions"><button class="primary" id="generate">✦ Tasarımı oluştur</button><button class="danger" id="stop" disabled>Durdur</button></div>
  <div class="hint">Kod geldikçe burada görünür. AI hizmeti için internet ve Puter hesabı gerekebilir.</div>
  <div class="status" id="status" role="status" aria-live="polite">Hazır. Ne yapmak istediğini yaz.</div>
- <div class="panelhead"><h2>OLUŞTURULAN KOD</h2><div class="actions"><button id="runCode" class="primary">▶ Önizle ve çalıştır</button><button id="copy">Kodu kopyala</button></div></div>
+ <div class="panelhead"><h2>OLUŞTURULAN KOD</h2><div class="actions"><button id="runCode" class="primary">▶ Önizle</button><button id="runNewTab">Kodu ayrı pencerede çalıştır</button><button id="copy">Kodu kopyala</button></div></div>
  <textarea class="editor" id="code" spellcheck="false" placeholder="Oluşturulan HTML kodu burada görünecek. İstersen düzenleyip Kodu çalıştır’a basabilirsin.">Henüz kod oluşturulmadı.</textarea>
 </section>
 <section class="panel previewPanel">
@@ -67,25 +67,31 @@ function cleanHTML(value){
 function setBusy(value){
  busy=value;generate.disabled=value;stopButton.disabled=!value;
 }
+let activeBlobUrl=null;
 function renderPreview(html){
- const bridge = `<script>
- window.addEventListener('error',function(e){
-   parent.postMessage({type:'preview-error',message:e.message||'JavaScript hatası'},'*');
- });
- window.addEventListener('unhandledrejection',function(e){
-   parent.postMessage({type:'preview-error',message:String(e.reason||'İşlenmeyen JavaScript hatası')},'*');
- });
- <\/script>`;
- const runnable = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, bridge+'</body>') : html+bridge;
- previewState.textContent='Çalıştırılıyor…';
- preview.srcdoc=runnable;
+ if(activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
+ const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+ activeBlobUrl=URL.createObjectURL(blob);
+ previewState.textContent='Kod yükleniyor…';
+ preview.onload=()=>{previewState.textContent='Kod çalışıyor';};
+ preview.onerror=()=>{previewState.textContent='Çalıştırılamadı';status.textContent='Kod önizlemeye yüklenemedi.';};
+ preview.src=activeBlobUrl;
 }
-preview.addEventListener('load',()=>{previewState.textContent='Önizleme hazır';});
-window.addEventListener('message',(event)=>{
- if(event.source!==preview.contentWindow || event.data?.type!=='preview-error')return;
- previewState.textContent='Kod hatası';
- status.textContent='Önizleme JavaScript hatası: '+event.data.message;
-});
+function runInNewTab(){
+ try{
+   const source=code.value.trim();
+   if(!source || source==='Henüz kod oluşturulmadı.' || source==='Kod üretilemedi.'){
+     status.textContent='Önce kod oluştur veya kod alanına HTML yapıştır.';return;
+   }
+   const html=cleanHTML(source);
+   const url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
+   const tab=window.open(url,'_blank');
+   if(!tab){URL.revokeObjectURL(url);status.textContent='Yeni sekme engellendi. Tarayıcıda açılır pencerelere izin ver.';return;}
+   tab.opener=null;
+   setTimeout(()=>URL.revokeObjectURL(url),60000);
+   status.textContent='Kod yeni sekmede çalıştırıldı.';
+ }catch(error){status.textContent='Çalıştırma hatası: '+(error?.message||String(error));}
+}
 generate.addEventListener('click',async()=>{
  const idea=promptBox.value.trim();
  if(!idea){status.textContent='Önce ne oluşturmak istediğini yaz.';promptBox.focus();return;}
@@ -136,6 +142,8 @@ document.getElementById('runCode').addEventListener('click',()=>{
    status.textContent='Önizleme hatası: '+(error?.message||String(error));
  }
 });
+
+document.getElementById('runNewTab').addEventListener('click',runInNewTab);
 
 document.getElementById('copy').addEventListener('click',async()=>{
  const text=code.value||generated;
