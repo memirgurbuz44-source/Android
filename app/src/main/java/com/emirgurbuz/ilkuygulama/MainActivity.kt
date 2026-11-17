@@ -118,9 +118,9 @@ class MainActivity : Activity() {
         status.text = "Puter AI kod yazıyor..."
         val instruction = """
 Sen deneyimli bir web arayüzü geliştiricisisin. Kullanıcının isteğine göre güzel, modern ve çalışan bir arayüz tasarla.
-Yalnızca TEK DOSYALIK, tam HTML belgesi döndür. CSS style etiketi içinde, JavaScript script etiketi içinde olsun.
-Markdown kod çiti, açıklama veya başka metin yazma. Harici kütüphane, internet görseli, dış bağlantı veya sunucu kullanma.
-Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan zengin ve etkileşimli olsun.
+Yalnızca TEK DOSYALIK, tam HTML belgesi döndür. CSS ve JavaScript HTML içinde olsun.
+Markdown kod çiti veya açıklama yazma. Harici kütüphane ve internet bağlantısı kullanma.
+Kısa, optimize edilmiş, mobil uyumlu ve çalışan kod üret; gereksiz efekt ve tekrarları kullanma.
 İstek: $idea
         """.trimIndent()
         val encoded = org.json.JSONObject.quote(instruction)
@@ -150,7 +150,7 @@ Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan 
             window.generateCode = async function(prompt) {
               try {
                 if (!window.puter || !puter.ai) throw new Error("Puter AI yüklenemedi. İnternet bağlantını kontrol et.");
-                const response = await puter.ai.chat(prompt, {model: "gpt-5.4-nano", max_tokens: 8192, temperature: 0.7});
+                const response = await puter.ai.chat(prompt, {model: "gpt-5.4-nano", max_tokens: 4096, temperature: 0.4});
                 let answer = response?.message?.content ?? response?.content ?? response?.text ?? response;
                 if (Array.isArray(answer)) answer = answer.map(x => typeof x === "string" ? x : (x?.text || "")).join("\\n");
                 if (answer && typeof answer === "object") answer = answer.text ?? answer.content ?? "";
@@ -169,9 +169,11 @@ Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan 
         @JavascriptInterface
         fun onResult(answer: String) {
             runOnUiThread {
-                val html = answer.replace("```html", "").replace("```", "").trim()
-                if (!html.contains("<html", true) && !html.contains("<!doctype", true)) {
-                    status.text = "AI geçerli HTML kodu döndürmedi. Tekrar dene."
+                val cleaned = answer.replace(Regex("(?i)^\\s*```(?:html)?\\s*"), "").replace(Regex("\\s*```\\s*$"), "").trim()
+                val html = if (cleaned.contains("<html", true) || cleaned.contains("<!doctype", true)) cleaned
+                    else "<!doctype html><html lang=\\"tr\\"><head><meta charset=\\"utf-8\\"><meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\"></head><body>$cleaned</body></html>"
+                if (cleaned.isBlank()) {
+                    status.text = "AI boş yanıt verdi. Tekrar dene."
                 } else {
                     showCode(html)
                     getPreferences(0).edit().putString("generated_html", html).apply()
@@ -193,7 +195,7 @@ Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan 
     private fun showCode(html: String) {
         generatedCode = html
         codeView.text = html
-        val csp = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'\">"
+        val csp = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data: blob:; media-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'\">"
         val safeHtml = if (html.contains("<head", true)) {
             html.replaceFirst(Regex("(?i)<head[^>]*>"), "$0$csp")
         } else "<html><head>$csp</head><body>$html</body></html>"
