@@ -67,15 +67,12 @@ function cleanHTML(value){
 function setBusy(value){
  busy=value;generate.disabled=value;stopButton.disabled=!value;
 }
-let activeBlobUrl=null;
 function renderPreview(html){
- if(activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
- const blob=new Blob([html],{type:'text/html;charset=utf-8'});
- activeBlobUrl=URL.createObjectURL(blob);
  previewState.textContent='Kod yükleniyor…';
- preview.onload=()=>{previewState.textContent='Kod çalışıyor';};
- preview.onerror=()=>{previewState.textContent='Çalıştırılamadı';status.textContent='Kod önizlemeye yüklenemedi.';};
- preview.src=activeBlobUrl;
+ status.textContent='HTML önizlemeye aktarılıyor…';
+ preview.onload=()=>{previewState.textContent='Önizleme yüklendi';status.textContent='Sayfa yüklendi. Bir hata varsa aşağıda gösterilecek.';};
+ preview.onerror=()=>{previewState.textContent='Yüklenemedi';status.textContent='Tarayıcı önizlemeyi yükleyemedi.';};
+ preview.srcdoc=html;
 }
 function runInNewTab(){
  try{
@@ -151,8 +148,9 @@ document.getElementById('copy').addEventListener('click',async()=>{
  try{await navigator.clipboard.writeText(text);status.textContent='Kod kopyalandı.';}
  catch(_){status.textContent='Kopyalama izni yok. Kodu seçip Ctrl+C kullanabilirsin.';}
 });
+const emptyPreview='<!doctype html><html lang="tr"><head><meta charset="utf-8"><style>html,body{margin:0;min-height:100%;font:15px Arial;background:#fff;color:#64748b}body{min-height:100vh;display:grid;place-items:center}</style></head><body>Oluşturduğun tasarım burada görünecek.</body></html>';
 const saved=(()=>{try{return localStorage.getItem('generated_html')}catch(_){return null}})();
 if(saved){generated=saved;code.value=saved;renderPreview(saved);status.textContent='Önceki tasarım yüklendi.';}
-else{preview.srcdoc='<!doctype html><html><body style="margin:0;display:grid;place-items:center;height:100vh;font:15px Arial;color:#64748b">Oluşturduğun tasarım burada görünecek.</body></html>';}
+else{preview.srcdoc=emptyPreview;previewState.textContent='Kod bekleniyor';}
 </script>
 </body></html>
