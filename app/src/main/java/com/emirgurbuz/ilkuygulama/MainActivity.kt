@@ -151,11 +151,13 @@ Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan 
               try {
                 if (!window.puter || !puter.ai) throw new Error("Puter AI yüklenemedi. İnternet bağlantını kontrol et.");
                 const response = await puter.ai.chat(prompt, {model: "gpt-5.4-nano", max_tokens: 8192, temperature: 0.7});
-                let answer = response && response.message ? response.message.content : "";
-                if (Array.isArray(answer)) answer = answer.map(x => x.text || "").join("\\n");
+                let answer = response?.message?.content ?? response?.content ?? response?.text ?? response;
+                if (Array.isArray(answer)) answer = answer.map(x => typeof x === "string" ? x : (x?.text || "")).join("\\n");
+                if (answer && typeof answer === "object") answer = answer.text ?? answer.content ?? "";
                 AndroidBridge.onResult(String(answer || ""));
               } catch (error) {
-                AndroidBridge.onError(String(error && error.message ? error.message : error));
+                let detail = ""; try { detail = typeof error === "string" ? error : JSON.stringify(error); } catch (_) { detail = String(error); }
+                AndroidBridge.onError(String(error?.message || detail || "Bilinmeyen hata"));
               }
             };
             </script></body></html>
