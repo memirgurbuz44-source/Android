@@ -61,6 +61,8 @@ class MainActivity : Activity() {
         page.addView(generateButton)
         generateButton.setOnClickListener { generate() }
         setupAiEngine()
+        aiEngine.visibility = View.INVISIBLE
+        page.addView(aiEngine, LinearLayout.LayoutParams(1, 1))
         page.addView(gap(16))
         page.addView(label("CANLI ÖNİZLEME", 16, Color.WHITE, true))
         preview = WebView(this).apply {
@@ -138,7 +140,6 @@ Tüm tasarım kendi içinde çalışsın; mobil ekrana uyumlu, görsel açıdan 
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     aiReady = true
-                    runOnUiThread { status.text = "AI bağlantısı hazır. Tasarımını yazabilirsin." }
                 }
             }
         }
