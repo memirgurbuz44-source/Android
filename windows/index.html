@@ -29,7 +29,7 @@ button:hover:not(:disabled){border-color:#58d8ff;background:#1c3850}button:disab
 </style>
 </head>
 <body>
-<header><div><div class="brand">✦ Emir Gürbüz <span>AI Studio</span></div><div class="sub">Yaz • Oluştur • Önizle</div></div><div class="sub">AI destekli kod üretici</div></header>
+<header><div><div class="brand">✦ Emir Gürbüz <span>AI Studio</span></div><div class="sub">Yaz • Oluştur • Önizle</div></div><div class="sub">AI destekli içerik oluşturucu</div></header>
 <main>
 <section class="panel">
  <div class="panelhead"><h2>NE OLUŞTURMAK İSTİYORSUN?</h2><span class="pill">HTML / CSS / JS</span></div>
@@ -41,7 +41,7 @@ button:hover:not(:disabled){border-color:#58d8ff;background:#1c3850}button:disab
   <button type="button" class="mode" data-mode="image">🖼️ Resim</button>
   <button type="button" class="mode" data-mode="chat">💬 Sohbet</button>
  </div>
- <div class="hint">Normal Türkçe yaz. Otomatik mod isteğini algılar; istersen oluşturma türünü kendin seç.</div>
+ <div class="hint">Ne istediğini normal Türkçe yaz. Resim istiyorsan doğrudan resim üretir; web uygulaması istiyorsan çalışan uygulama oluşturur. Ek soru sormaz.</div>
  <div class="status" id="status" role="status" aria-live="polite">Hazır. Ne yapmak istediğini yaz.</div>
  <div class="panelhead"><h2>OLUŞTURULAN KOD</h2><div class="actions"><button id="runCode" class="primary">▶ Önizle</button><button id="runNewTab">Kodu ayrı pencerede çalıştır</button><button id="copy">Kodu kopyala</button></div></div>
  <textarea class="editor" id="code" spellcheck="false" placeholder="Oluşturulan HTML kodu burada görünecek. İstersen düzenleyip Kodu çalıştır’a basabilirsin.">Henüz kod oluşturulmadı.</textarea>
@@ -61,7 +61,9 @@ const preview=document.getElementById('preview');
 const previewState=document.getElementById('previewState');
 let generated='';
 let controller=null;
-let busy=false;\nlet selectedMode='auto';\ndocument.querySelectorAll('.mode').forEach(button=>button.addEventListener('click',()=>{selectedMode=button.dataset.mode;document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('active',b===button));status.textContent='Mod seçildi: '+button.textContent.trim();}));
+let busy=false;
+let selectedMode='auto';
+document.querySelectorAll('.mode').forEach(button=>button.addEventListener('click',()=>{selectedMode=button.dataset.mode;document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('active',b===button));status.textContent='Mod seçildi: '+button.textContent.trim();}));
 function cleanHTML(value){
  let html=String(value||'').trim();
  html=html.replace(/^`{3}(?:html)?\s*/i,'').replace(/\s*`{3}\s*$/,'').trim();
@@ -104,9 +106,9 @@ function escapeHTML(value){
 function detectMode(idea){
  if(selectedMode!=='auto') return selectedMode;
  const q=idea.toLocaleLowerCase('tr-TR');
- if(/(resim|fotoğraf|görsel|illüstrasyon|çizim|duvar kağıdı|wallpaper|manzara|portre|logo|afiş|poster|ikon|karakter çiz|çizimini|görselini)/.test(q) ||
-    /(çiz|resmet|görselleştir)/.test(q)) return 'image';
- if(/^(merhaba|selam|hey)\\b/.test(q) ||
+ if(/(resim|fotoğraf|görsel|illüstrasyon|çizim|duvar kağıdı|wallpaper|manzara|portre|logo|afiş|poster|ikon|karakter|çizimini|görselini|resmini|fotoğrafını)/.test(q) ||
+    /(çiz|resmet|görselleştir|resim yap|fotoğraf yap|görsel yap|bir resim|bana resim|bana fotoğraf)/.test(q)) return 'image';
+ if(/^(merhaba|selam|hey)\b/.test(q) ||
     /(nedir|ne demek|nasıl çalışır|nasıl yapılır|neden|niçin|kimdir|ne zaman|anlat|açıkla|özetle|karşılaştır|yardım eder misin|soru)/.test(q)) return 'chat';
  return 'code';
 }
