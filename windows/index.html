@@ -27,13 +27,14 @@ generate.onclick=async()=>{
  const instruction='Sen deneyimli bir web arayüzü geliştiricisisin. İsteğe göre modern ve çalışan arayüz tasarla. Yalnızca tek dosyalık tam HTML belgesi döndür. CSS style, JavaScript script içinde olsun. Markdown çiti veya açıklama yazma. Mobil uyumlu ve etkileşimli olsun. İstek: '+idea;
  try{
   const response=await puter.ai.chat(instruction,{model:'gpt-5.4-nano',max_tokens:8192,temperature:.7});
-  let answer=response&&response.message?response.message.content:'';
-  if(Array.isArray(answer))answer=answer.map(x=>x.text||'').join('\n');
-  generated=String(answer||'').replace(/^```html\s*/i,'').replace(/\s*```$/,'').trim();
+  let answer=response?.message?.content ?? response?.content ?? response?.text ?? response;
+  if(Array.isArray(answer))answer=answer.map(x=>typeof x==='string'?x:(x?.text??'')).join('\n');
+  if(answer && typeof answer==='object') answer=answer.text ?? answer.content ?? '';
+  generated=String(answer||'').replace(/^```(?:html)?\s*/i,'').replace(/\s*```$/,'').trim();
   if(!/<html|<!doctype/i.test(generated))throw new Error('AI geçerli HTML döndürmedi. Tekrar dene.');
   code.textContent=generated;preview.srcdoc=generated;status.textContent='Kod hazır! Önizlemesi sağda.';
   localStorage.setItem('generated_html',generated);
- }catch(e){status.textContent='AI hatası: '+(e.message||e);}
+ }catch(e){let detail='';try{detail=typeof e==='string'?e:JSON.stringify(e);}catch(_){detail=String(e);}status.textContent='AI hatası: '+(e?.message||detail||'Bilinmeyen hata');}
  finally{generate.disabled=false;}
 };
 document.getElementById('copy').onclick=async()=>{if(!generated)return;try{await navigator.clipboard.writeText(generated);status.textContent='Kod panoya kopyalandı.';}catch(e){status.textContent='Kopyalama başarısız.';}};
