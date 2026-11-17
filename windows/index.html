@@ -34,11 +34,11 @@ button:hover:not(:disabled){border-color:#58d8ff;background:#1c3850}button:disab
  <div class="actions"><button class="primary" id="generate">✦ Tasarımı oluştur</button><button class="danger" id="stop" disabled>Durdur</button></div>
  <div class="hint">Kod geldikçe burada görünür. AI hizmeti için internet ve Puter hesabı gerekebilir.</div>
  <div class="status" id="status" role="status" aria-live="polite">Hazır. Ne yapmak istediğini yaz.</div>
- <div class="panelhead"><h2>OLUŞTURULAN KOD</h2><button id="copy">Kodu kopyala</button></div>
+ <div class="panelhead"><h2>OLUŞTURULAN KOD</h2><div class="actions"><button id="runCode" class="primary">▶ Önizle ve çalıştır</button><button id="copy">Kodu kopyala</button></div></div>
  <textarea class="editor" id="code" spellcheck="false" placeholder="Oluşturulan HTML kodu burada görünecek. İstersen düzenleyip Kodu çalıştır’a basabilirsin.">Henüz kod oluşturulmadı.</textarea>
 </section>
 <section class="panel previewPanel">
- <div class="panelhead"><h2>ÖNİZLEME</h2><div class="actions"><button id="runCode" class="primary">▶ Kodu çalıştır</button><span class="sub" id="previewState">Bekleniyor</span></div></div>
+ <div class="panelhead"><h2>ÇALIŞAN ÖNİZLEME</h2><span class="sub" id="previewState">Kod bekleniyor</span></div>
  <iframe id="preview" title="Oluşturulan tasarımın önizlemesi" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"></iframe>
 </section>
 </main>
@@ -68,9 +68,24 @@ function setBusy(value){
  busy=value;generate.disabled=value;stopButton.disabled=!value;
 }
 function renderPreview(html){
- preview.srcdoc=html;
- previewState.textContent='Önizleme güncellendi';
+ const bridge = `<script>
+ window.addEventListener('error',function(e){
+   parent.postMessage({type:'preview-error',message:e.message||'JavaScript hatası'},'*');
+ });
+ window.addEventListener('unhandledrejection',function(e){
+   parent.postMessage({type:'preview-error',message:String(e.reason||'İşlenmeyen JavaScript hatası')},'*');
+ });
+ <\/script>`;
+ const runnable = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, bridge+'</body>') : html+bridge;
+ previewState.textContent='Çalıştırılıyor…';
+ preview.srcdoc=runnable;
 }
+preview.addEventListener('load',()=>{previewState.textContent='Önizleme hazır';});
+window.addEventListener('message',(event)=>{
+ if(event.source!==preview.contentWindow || event.data?.type!=='preview-error')return;
+ previewState.textContent='Kod hatası';
+ status.textContent='Önizleme JavaScript hatası: '+event.data.message;
+});
 generate.addEventListener('click',async()=>{
  const idea=promptBox.value.trim();
  if(!idea){status.textContent='Önce ne oluşturmak istediğini yaz.';promptBox.focus();return;}
@@ -107,12 +122,16 @@ stopButton.addEventListener('click',()=>{if(controller)controller.abort();});
 
 document.getElementById('runCode').addEventListener('click',()=>{
  try{
-   const html=cleanHTML(code.value);
+   const source=code.value.trim();
+   if(!source || source==='Henüz kod oluşturulmadı.' || source==='Kod üretilemedi.'){
+     status.textContent='Önce kod oluştur veya kod alanına HTML yapıştır.';
+     return;
+   }
+   const html=cleanHTML(source);
    generated=html;
-   code.value=html;
    renderPreview(html);
    try{localStorage.setItem('generated_html',html);}catch(_){}
-   status.textContent='Kod çalıştırıldı. Önizleme güncellendi.';
+   status.textContent='Kod önizlemede çalıştırılıyor…';
  }catch(error){
    status.textContent='Önizleme hatası: '+(error?.message||String(error));
  }
