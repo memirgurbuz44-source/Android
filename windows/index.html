@@ -22,7 +22,7 @@ const promptBox=document.getElementById('prompt'),generate=document.getElementBy
 let generated='';
 function normalizeHTML(value){
  let html=String(value||'').trim().replace(/^\`\`\`(?:html)?\s*/i,'').replace(/\s*\`\`\`$/,'').trim();
- const match=html.match(/<!doctype html[\\s\\S]*|<html[\\s\\S]*/i);
+ const match=html.match(/<!doctype html[\s\S]*|<html[\s\S]*/i);
  if(match) return match[0];
  if(!html) throw new Error('AI boş yanıt verdi. Tekrar dene.');
  return '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Tasarımı</title></head><body>'+html+'</body></html>';
